@@ -1,0 +1,36 @@
+[Unit]
+Description=nginx-ai-gateway Chatbot Proxy (Azure OpenAI)
+Documentation=https://github.com/YOURUSERNAME/nginx-ai-gateway
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/routine-chatbot
+
+# Start command — uses full path to node
+ExecStart=/usr/bin/node server.js
+
+# Restart automatically if it crashes
+Restart=on-failure
+RestartSec=10
+
+# Log to journald (view with: sudo journalctl -u routine-chatbot -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=routine-chatbot
+
+# =============================================================
+# ENVIRONMENT VARIABLES
+# Replace the placeholder values below with your real values
+# DO NOT commit this file with real keys — use placeholders here
+# and set real values directly on the server after deployment
+# =============================================================
+Environment=PORT=3001
+Environment=AZURE_API_KEY=REPLACE_WITH_YOUR_ACTUAL_KEY
+Environment=AZURE_ENDPOINT=https://YOUR-RESOURCE.openai.azure.com/openai/deployments/YOUR-DEPLOYMENT/chat/completions?api-version=2024-02-01
+
+[Install]
+WantedBy=multi-user.target
