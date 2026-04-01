@@ -1,6 +1,6 @@
 [Unit]
 Description=nginx-ai-gateway Chatbot Proxy (Azure OpenAI)
-Documentation=https://github.com/YOURUSERNAME/nginx-ai-gateway
+Documentation=https://github.com/YOURUSERNAME/llm-proxy-infra
 After=network.target
 Wants=network-online.target
 
