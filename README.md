@@ -281,11 +281,10 @@ sudo apt update
 ```
 
 Why this happens in detail: NGINX Plus repos at pkgs.nginx.com
-require a valid JWT token embedded in the repo URL. The token is
+require a valid crt-key pair to request against the repo URL. The crt-key is
 tied to your NGINX Plus subscription. When it expires, every
 `apt update` fails with 400. Your running NGINX Plus binary keeps
-working — only the package update mechanism breaks. Fix the token
-permanently by regenerating it in your F5/NGINX portal at
+working — only the package update mechanism breaks. Fix it by regenerating it in your F5/NGINX portal at
 https://my.f5.com.
 
 ### Step 4 — Install Node.js 20
