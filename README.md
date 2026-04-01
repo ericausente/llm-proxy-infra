@@ -1,10 +1,9 @@
-# nginx-ai-gateway
+# nginx-llm-proxy
 
-A production-grade static site on AWS EC2 with NGINX Plus,
+A static site on AWS EC2 with NGINX Plus,
 featuring a context-aware AI chat assistant proxied through a
 secured Node.js backend to Azure OpenAI.
 
-> Built by an F5/NGINX solutions engineer in Singapore.
 > The stack is intentionally minimal: one Ubuntu server, one HTML
 > file, one Node.js process, one NGINX Plus config. No Kubernetes,
 > no Lambda, no managed API gateway. Just the fundamentals,
