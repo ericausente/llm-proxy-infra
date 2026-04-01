@@ -1,5 +1,22 @@
 # nginx-llm-proxy
 
+> **Repository scope notice**
+>
+> This repository documents the **infrastructure, configuration, and
+> deployment architecture** of this project — NGINX Plus setup, Node.js
+> proxy pattern, Azure OpenAI integration, systemd service management,
+> and Ubuntu AWS deployment.
+>
+> The `website/` directory and its HTML files are **intentionally excluded**
+> from this repository. The frontend contains personal health data, private
+> routine details, and domain-specific system prompt content that is not
+> intended for public distribution.
+>
+> If you are using this repo as a reference to build your own similar
+> stack, replace the `website/` files with your own static site and
+> update the system prompt in `chatbot/server.js` with your own
+> domain context.
+
 A static site on AWS EC2 with NGINX Plus,
 featuring a context-aware AI chat assistant proxied through a
 secured Node.js backend to Azure OpenAI.
