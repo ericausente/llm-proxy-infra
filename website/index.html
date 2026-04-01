@@ -1,1 +1,119 @@
- (html site without chatbox)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Protocol — routine.kushikimi.xyz</title>
+<style>
+  body {
+    background: #0a0a0f;
+    color: #f0f0f5;
+    font-family: 'Inter', system-ui, sans-serif;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+    line-height: 1.7;
+  }
+
+  /* -----------------------------------------------
+     This is a static page — no JavaScript, no API.
+     NGINX Plus serves this file directly from:
+     /var/www/routine-kushikimi/index.html
+
+     The full production version (index-with-chat.html)
+     adds a chat widget that calls /api/chat, which
+     NGINX proxies to the Node.js backend on port 3001.
+     ----------------------------------------------- */
+
+  h1 {
+    font-size: 2.5rem;
+    font-weight: 600;
+    letter-spacing: -1px;
+    margin-bottom: 0.5rem;
+  }
+  h1 span { color: #4ade80; }
+  .sub {
+    color: #8888a0;
+    font-size: 15px;
+    margin-bottom: 3rem;
+  }
+  .section {
+    margin-bottom: 3rem;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    padding: 1.5rem;
+    background: #12121a;
+  }
+  .section h2 {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #4ade80;
+    margin-bottom: 1rem;
+  }
+  .item {
+    font-size: 13px;
+    color: #8888a0;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    line-height: 1.6;
+  }
+  .item:last-child { border-bottom: none; }
+  .item strong { color: #f0f0f5; font-weight: 500; }
+  footer {
+    margin-top: 4rem;
+    font-size: 12px;
+    color: #444458;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<h1>Daily Protocol <span>&#x2022;</span> Static Version</h1>
+<p class="sub">
+  This is the static version of the site — no chat widget.<br>
+  NGINX Plus serves this file directly from
+  <code style="color:#4ade80">/var/www/routine-kushikimi/index.html</code>
+</p>
+
+<div class="section">
+  <h2>How this page is served</h2>
+  <div class="item">
+    <strong>1. Browser requests</strong>
+    https://routine.kushikimi.xyz
+  </div>
+  <div class="item">
+    <strong>2. NGINX Plus</strong>
+    handles SSL termination, checks basic auth,
+    serves this static HTML file — no backend involved
+  </div>
+  <div class="item">
+    <strong>3. No API calls</strong>
+    This version has zero JavaScript.
+    Everything is plain HTML rendered by the browser.
+  </div>
+  <div class="item">
+    <strong>4. Production version</strong>
+    index-with-chat.html adds a chat widget that calls
+    POST /api/chat — proxied by NGINX to Node.js on port 3001,
+    which forwards to Azure OpenAI
+  </div>
+</div>
+
+<div class="section">
+  <h2>Stack at a glance</h2>
+  <div class="item"><strong>Web server</strong> NGINX Plus on Ubuntu 22.04 AWS EC2</div>
+  <div class="item"><strong>SSL</strong> Let's Encrypt via certbot</div>
+  <div class="item"><strong>Auth</strong> NGINX basic auth — /etc/nginx/.htpasswd</div>
+  <div class="item"><strong>Static files</strong> /var/www/routine-kushikimi/</div>
+  <div class="item"><strong>Chat backend</strong> Node.js Express on 127.0.0.1:3001</div>
+  <div class="item"><strong>AI endpoint</strong> Azure OpenAI gpt-4o-mini</div>
+  <div class="item"><strong>Chat route</strong> POST /api/chat → proxy_pass 127.0.0.1:3001</div>
+</div>
+
+<footer>routine.kushikimi.xyz &mdash; static version &mdash; see index-with-chat.html for full site</footer>
+
+</body>
+</html>
