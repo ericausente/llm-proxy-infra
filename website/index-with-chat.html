@@ -1,1 +1,580 @@
- (html - version with chat widget)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Protocol — routine.kushikimi.xyz</title>
+<style>
+  body {
+    background: #0a0a0f;
+    color: #f0f0f5;
+    font-family: 'Inter', system-ui, sans-serif;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+    line-height: 1.7;
+  }
+
+  /* -----------------------------------------------
+     CHAT WIDGET EXPLAINED:
+
+     The green bubble (bottom-right) opens a chat panel.
+     When the user sends a message, this page calls:
+
+       POST /api/chat
+       Content-Type: application/json
+       credentials: include  (passes basic auth to NGINX)
+
+       Body: { messages: [ {role, content}, ... ] }
+
+     NGINX Plus receives the request at /api/chat,
+     rate-limits it (10 req/min per IP), then
+     proxy_passes it to Node.js on 127.0.0.1:3001.
+
+     Node.js prepends the full system prompt,
+     forwards to Azure OpenAI, and returns:
+
+       { reply: "..." }
+
+     The chat widget displays reply in the panel.
+     The API key never touches the browser.
+     ----------------------------------------------- */
+
+  h1 { font-size: 2.5rem; font-weight: 600; letter-spacing: -1px; margin-bottom: 0.5rem; }
+  h1 span { color: #4ade80; }
+  .sub { color: #8888a0; font-size: 15px; margin-bottom: 3rem; }
+  .section {
+    margin-bottom: 2rem;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    padding: 1.5rem;
+    background: #12121a;
+  }
+  .section h2 {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #4ade80;
+    margin-bottom: 1rem;
+  }
+  .item {
+    font-size: 13px;
+    color: #8888a0;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    line-height: 1.6;
+  }
+  .item:last-child { border-bottom: none; }
+  .item strong { color: #f0f0f5; font-weight: 500; }
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 0.5rem;
+  }
+  .flow-step {
+    background: #1a1a26;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #8888a0;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .flow-num {
+    font-size: 11px;
+    font-weight: 700;
+    color: #4ade80;
+    min-width: 18px;
+    padding-top: 1px;
+  }
+  .flow-text strong { color: #f0f0f5; font-weight: 500; }
+  footer {
+    margin-top: 4rem;
+    font-size: 12px;
+    color: #444458;
+    text-align: center;
+    padding-bottom: 5rem;
+  }
+
+  /* ============================================
+     CHAT WIDGET STYLES
+     ============================================ */
+  .chat-bubble {
+    position: fixed;
+    bottom: 28px; right: 28px;
+    z-index: 999;
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    background: #4ade80;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .2s, background .2s;
+  }
+  .chat-bubble:hover { transform: scale(1.08); background: #22c55e; }
+  .chat-bubble svg {
+    width: 24px; height: 24px;
+    fill: none; stroke: #0a0a0f;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .chat-window {
+    position: fixed;
+    bottom: 96px; right: 28px;
+    z-index: 999;
+    width: 370px;
+    max-width: calc(100vw - 40px);
+    background: #12121a;
+    border: 1px solid rgba(74,222,128,0.25);
+    border-radius: 20px;
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+  }
+  .chat-window.open { display: flex; }
+  .chat-header {
+    background: #0a150a;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(74,222,128,0.12);
+  }
+  .chat-header-left { display: flex; align-items: center; gap: 10px; }
+  .chat-avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: rgba(74,222,128,0.12);
+    border: 1px solid rgba(74,222,128,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .chat-title { font-size: 14px; font-weight: 600; color: #f0f0f5; }
+  .chat-subtitle { font-size: 11px; color: #4ade80; margin-top: 1px; }
+  .chat-close {
+    background: none; border: none;
+    color: #8888a0; cursor: pointer;
+    font-size: 22px; line-height: 1;
+    padding: 2px 6px; border-radius: 6px;
+    transition: color .2s;
+  }
+  .chat-close:hover { color: #f0f0f5; }
+  .chat-msgs {
+    height: 300px;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    scroll-behavior: smooth;
+  }
+  .chat-msgs::-webkit-scrollbar { width: 4px; }
+  .chat-msgs::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+  }
+  .msg {
+    max-width: 88%;
+    font-size: 13px;
+    line-height: 1.65;
+    padding: 10px 14px;
+    border-radius: 14px;
+    animation: msgIn .18s ease;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: rgba(74,222,128,0.12);
+    border: 1px solid rgba(74,222,128,0.2);
+    color: #f0f0f5;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.bot {
+    align-self: flex-start;
+    background: #1a1a26;
+    border: 1px solid rgba(255,255,255,0.07);
+    color: #d0d0e0;
+    border-bottom-left-radius: 4px;
+  }
+  .msg.typing { color: #8888a0; font-style: italic; }
+  .chat-suggestions {
+    padding: 0 14px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .sug {
+    background: rgba(74,222,128,0.06);
+    border: 1px solid rgba(74,222,128,0.16);
+    color: #4ade80;
+    font-size: 11px;
+    padding: 5px 11px;
+    border-radius: 100px;
+    cursor: pointer;
+    transition: background .2s;
+    font-family: inherit;
+  }
+  .sug:hover { background: rgba(74,222,128,0.14); }
+  .chat-input-row {
+    padding: 12px 14px;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .chat-input {
+    flex: 1;
+    background: #0a0a0f;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 10px 14px;
+    color: #f0f0f5;
+    font-size: 13px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    max-height: 100px;
+    line-height: 1.5;
+    transition: border-color .2s;
+  }
+  .chat-input:focus { border-color: rgba(74,222,128,0.35); }
+  .chat-input::placeholder { color: #444458; }
+  .chat-send {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: #4ade80;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background .2s, transform .15s;
+  }
+  .chat-send:hover { background: #22c55e; transform: scale(1.05); }
+  .chat-send:disabled { background: #1a3a1a; cursor: not-allowed; transform: none; }
+  .chat-send svg {
+    width: 16px; height: 16px;
+    fill: none; stroke: #0a0a0f;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  @media(max-width: 600px) {
+    .chat-window { right: 12px; bottom: 88px; width: calc(100vw - 24px); }
+    .chat-bubble { right: 16px; bottom: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Daily Protocol <span>&#x2022;</span> With Chat</h1>
+<p class="sub">
+  This is the production version — includes the AI chat widget.<br>
+  The green bubble bottom-right connects to Azure OpenAI via your Node.js proxy.
+</p>
+
+<div class="section">
+  <h2>How the chat API call works</h2>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num">01</div>
+      <div class="flow-text">
+        <strong>User types a message</strong> and hits send.
+        JavaScript builds a messages array:
+        <code style="color:#4ade80;font-size:12px;display:block;margin-top:4px">
+          [{ role: "user", content: "What should I eat for lunch?" }]
+        </code>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">02</div>
+      <div class="flow-text">
+        <strong>fetch() sends POST to /api/chat</strong> on this same domain.
+        <code style="color:#4ade80;font-size:12px;display:block;margin-top:4px">
+          credentials: "include" passes basic auth automatically.
+          No API key in the browser. No cross-origin request.
+        </code>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">03</div>
+      <div class="flow-text">
+        <strong>NGINX Plus receives /api/chat</strong>, checks rate limit
+        (10 req/min), then proxy_passes to 127.0.0.1:3001.
+        Azure OpenAI is never called directly by the browser.
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">04</div>
+      <div class="flow-text">
+        <strong>Node.js prepends the system prompt</strong> (full domain
+        context ~800 tokens), keeps last 10 messages for history,
+        then POST to Azure OpenAI with api-key header.
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">05</div>
+      <div class="flow-text">
+        <strong>Azure OpenAI responds.</strong> Node.js extracts
+        <code style="color:#4ade80;font-size:12px">choices[0].message.content</code>
+        and returns <code style="color:#4ade80;font-size:12px">{ reply: "..." }</code>
+        to the browser. Widget displays it as a bot message.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Request shape (what fetch sends)</h2>
+  <div class="item">
+    <strong>Method</strong> POST
+  </div>
+  <div class="item">
+    <strong>URL</strong> /api/chat (same domain — no CORS)
+  </div>
+  <div class="item">
+    <strong>Header</strong> Content-Type: application/json
+  </div>
+  <div class="item">
+    <strong>Credentials</strong> include (browser sends basic auth cookie)
+  </div>
+  <div class="item">
+    <strong>Body</strong>
+    <code style="color:#4ade80;font-size:12px">
+      { "messages": [ { "role": "user", "content": "..." } ] }
+    </code>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Response shape (what Node.js returns)</h2>
+  <div class="item">
+    <strong>Success 200</strong>
+    <code style="color:#4ade80;font-size:12px">{ "reply": "For lunch, try chicken rice..." }</code>
+  </div>
+  <div class="item">
+    <strong>Rate limited 429</strong> Too many requests — NGINX rate limit hit
+  </div>
+  <div class="item">
+    <strong>Unauthorized 401</strong> Basic auth failed or credentials not sent
+  </div>
+  <div class="item">
+    <strong>Server error 500</strong> Node.js error — check journalctl logs
+  </div>
+  <div class="item">
+    <strong>Bad gateway 502</strong> Node.js not running — restart service
+  </div>
+</div>
+
+<footer>
+  routine.kushikimi.xyz &mdash; with chat widget &mdash;
+  API key lives only in systemd service environment variables
+</footer>
+
+<!-- ============================================
+     CHAT WIDGET
+     The actual implementation — see comments above
+     for full explanation of how each step works
+     ============================================ -->
+
+<button class="chat-bubble" id="chatBubble" aria-label="Open assistant">
+  <svg viewBox="0 0 24 24">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+</button>
+
+<div class="chat-window" id="chatWindow">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <div class="chat-avatar">&#x1F9E0;</div>
+      <div>
+        <div class="chat-title">Protocol Assistant</div>
+        <div class="chat-subtitle">Powered by Azure OpenAI</div>
+      </div>
+    </div>
+    <button class="chat-close" id="chatClose">&times;</button>
+  </div>
+
+  <div class="chat-msgs" id="chatMsgs">
+    <div class="msg bot">
+      Hey! Ask me anything about the protocol —
+      food, supplements, timing. I know the full routine.
+    </div>
+  </div>
+
+  <div class="chat-suggestions" id="chatSuggestions">
+    <button class="sug" onclick="sendSuggestion(this)">What to eat for lunch?</button>
+    <button class="sug" onclick="sendSuggestion(this)">What supplements now?</button>
+    <button class="sug" onclick="sendSuggestion(this)">I skipped my walk</button>
+  </div>
+
+  <div class="chat-input-row">
+    <textarea
+      class="chat-input"
+      id="chatInput"
+      placeholder="Ask about your protocol..."
+      rows="1"
+    ></textarea>
+    <button class="chat-send" id="chatSend">
+      <svg viewBox="0 0 24 24">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  // -----------------------------------------------
+  // State
+  // -----------------------------------------------
+  const bubble   = document.getElementById('chatBubble');
+  const win      = document.getElementById('chatWindow');
+  const closeBtn = document.getElementById('chatClose');
+  const msgs     = document.getElementById('chatMsgs');
+  const input    = document.getElementById('chatInput');
+  const sendBtn  = document.getElementById('chatSend');
+  const suggs    = document.getElementById('chatSuggestions');
+
+  // Conversation history — sent with every request so the AI
+  // remembers what was said earlier in the session.
+  // Capped at 10 messages in server.js to control token usage.
+  let history  = [];
+  let loading  = false;
+
+  // -----------------------------------------------
+  // Toggle chat panel open / closed
+  // -----------------------------------------------
+  bubble.addEventListener('click', () => {
+    win.classList.toggle('open');
+    if (win.classList.contains('open')) input.focus();
+  });
+  closeBtn.addEventListener('click', () => win.classList.remove('open'));
+
+  // -----------------------------------------------
+  // Auto-resize textarea as user types
+  // -----------------------------------------------
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+  });
+
+  // Enter sends, Shift+Enter adds newline
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  sendBtn.addEventListener('click', sendMessage);
+
+  // -----------------------------------------------
+  // Suggestion chip clicked
+  // -----------------------------------------------
+  function sendSuggestion(btn) {
+    input.value = btn.textContent;
+    suggs.style.display = 'none';
+    sendMessage();
+  }
+
+  // -----------------------------------------------
+  // Add a message bubble to the panel
+  // -----------------------------------------------
+  function addMsg(role, text) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+    div.textContent = text;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    return div;
+  }
+
+  // -----------------------------------------------
+  // Core function — sends message to /api/chat
+  //
+  // Flow:
+  //   1. Build user message, add to history
+  //   2. Show typing indicator
+  //   3. POST to /api/chat with full history
+  //      - credentials:'include' passes NGINX basic auth
+  //      - body is JSON { messages: [...] }
+  //   4. Replace typing indicator with real reply
+  //   5. Add reply to history for next turn
+  // -----------------------------------------------
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text || loading) return;
+
+    loading = true;
+    sendBtn.disabled = true;
+    suggs.style.display = 'none';
+    input.value = '';
+    input.style.height = 'auto';
+
+    // Show user message
+    addMsg('user', text);
+    history.push({ role: 'user', content: text });
+
+    // Show typing indicator while waiting for Azure
+    const typing = addMsg('bot', 'thinking...');
+    typing.classList.add('typing');
+
+    try {
+      // THE ACTUAL API CALL
+      // /api/chat is on the same domain so no CORS headers needed
+      // NGINX rate-limits this endpoint to 10 req/min per IP
+      // NGINX proxies it to 127.0.0.1:3001 (Node.js)
+      // Node.js adds system prompt + calls Azure OpenAI
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // sends basic auth to NGINX
+        body: JSON.stringify({ messages: history })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        // Surface NGINX or Node errors to the user
+        typing.textContent = data.error
+          || `Error ${res.status} — try again`;
+        typing.classList.remove('typing');
+      } else {
+        const reply = data.reply || 'No response received.';
+        typing.textContent = reply;
+        typing.classList.remove('typing');
+        // Add to history so next message has context
+        history.push({ role: 'assistant', content: reply });
+        // Keep history bounded — older messages drop off
+        if (history.length > 20) history = history.slice(-20);
+      }
+
+    } catch (err) {
+      // Network error or server totally down
+      typing.textContent =
+        'Connection error — check server is running.';
+      typing.classList.remove('typing');
+      console.error('Chat error:', err);
+    }
+
+    loading = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+</script>
+
+</body>
+</html>
